@@ -1,5 +1,6 @@
 import pygame
 from pygame.locals import K_DOWN, K_ESCAPE, K_UP, K_LEFT, K_RIGHT, QUIT, KEYDOWN
+from random import randrange
 
 
 class SnakeHead(pygame.sprite.Sprite):
@@ -11,7 +12,7 @@ class SnakeHead(pygame.sprite.Sprite):
         self.rect = self.surf.get_rect(
             center=(screen.get_width()/2, screen.get_height()/2))
         self.speed = 25
-        self.moveDirectionX = self.speed * 1
+        self.moveDirectionX = 0
         self.moveDirectionY = 0
         self.score = score
 
@@ -30,39 +31,76 @@ class SnakeHead(pygame.sprite.Sprite):
         if pressedKey == K_RIGHT:
             self.moveDirectionX = self.speed * 1
             self.moveDirectionY = 0
-        # keep on screen
-        if self.rect.top <= 50:
-            self.rect.top = 50
-        if self.rect.bottom >= screen.get_height():
-            self.rect.bottom = screen.get_height()
-        if self.rect.left < 0:
-            self.rect.left = 0
-        if self.rect.right > screen.get_width():
-            self.rect.right = screen.get_width()
+
+    def playerSnake(self, screen1, snakeList):
+        for i in snakeList:
+            self.surf = pygame.Surface((25, 25))
+            self.surf.fill((100, 100, 100))
+            self.rect = self.surf.get_rect(center=(i[0], i[1]))
+            all_sprites.add(self)
+            for entity in all_sprites:
+                screen.blit(entity.surf, entity.rect)
 
 
-class SnakeTail(pygame.sprite.Sprite):
-    def __init__(self, screen, segment):  # head, previous tailsegment
+class Food(pygame.sprite.Sprite):
+    def __init__(self, screen, ):
         super().__init__()
         self.surf = pygame.Surface((25, 25))
-        self.surf.fill((255, 255, 0))
+        self.surf.fill((255, 0, 0))
         self.rect = self.surf.get_rect(
-            center=(segment.rect.x-12, segment.rect.y))
+            center=(
+                round((randrange(0, screen.get_width()-25)/25)) * 25,
+                round((randrange(0, screen.get_height()-25)/25)) * 25
+            )
+        )
 
-    def update(self, segment):
-        self.rect.move_ip(segment.moveDirectionX, segment.moveDirectionY)
-        
+    def update(self):
+        self.surf = pygame.Surface((25, 25))
+        self.surf.fill((255, 0, 0))
+        self.rect = self.surf.get_rect(
+            center=(
+                round((randrange(0, screen.get_width()-25)/25)) * 25,
+                round((randrange(0, screen.get_height()-25)/25)) * 25
+            )
+        )
+
+
+class ScoreBar(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.surf = pygame.Surface((400, 25))
+        self.surf.fill((0, 0, 200))
+        self.rect = self.surf.get_rect()
+        self.speedLevelFont = pygame.font.SysFont(None, 20)
+        self.snakeLengthFont = pygame.font.SysFont(None, 22)
+
+    def update(self, snakeLength, speedLevel, screen):
+        self.labelLevel = self.speedLevelFont.render(
+            'Level: ' + str(speedLevel), True, 'yellow')
+        self.labelLength = self.snakeLengthFont.render(
+            'Score: ' + str(snakeLength), True, 'yellow')
+        screen.blit(self.labelLength, (5, 20))
+        screen.blit(self.labelLevel, (330, 20))
+
 
 pygame.init()
-screen = pygame.display.set_mode((800, 600))
+screen = pygame.display.set_mode((400, 400))
+screen.fill((17, 193, 242))
 
+snakeList = []
+snakeLength = 1
+positionX = screen.get_width()/2
+positionY = screen.get_height()/2
 
 snakeHead1 = SnakeHead(screen)
-snakeTail1 = SnakeTail(screen, snakeHead1)
+food1 = Food(screen)
+scoreBar = ScoreBar()
+
 clock = pygame.time.Clock()
 all_sprites = pygame.sprite.Group()
 all_sprites.add(snakeHead1)
-all_sprites.add(snakeTail1)
+all_sprites.add(food1)
+all_sprites.add(scoreBar)
 
 running = True
 while running:
@@ -75,166 +113,44 @@ while running:
             elif event.key == K_UP or event.key == K_DOWN or event.key == K_LEFT or event.key == K_RIGHT:
                 snakeHead1.update(event.key)
 
+    positionX += snakeHead1.moveDirectionX
+    positionY += snakeHead1.moveDirectionY
+
     screen.fill((17, 193, 242))
-    
-    snakeHead1.update(None)
-    snakeTail1.update(snakeHead1)
+
+    scoreBar.update(snakeLength, 1, screen)  # why not showing on top of bar?
+
+    snakeHeadList = []
+    snakeHeadList.append(positionX)
+    snakeHeadList.append(positionY)
+    snakeList.append(snakeHeadList)
+    if len(snakeList) > snakeLength:
+        del snakeList[0]
+
+    # condition for endgames
+
+    for i in snakeList[:-1]:
+        if i == snakeHeadList:
+            running = False
+
+    if positionX > screen.get_width() - 25 or positionX < 0:
+        running = False
+    elif positionY > screen.get_height() - 25 or positionY < 0:
+        running = False
+
+    snakeHead1.playerSnake(screen, snakeList)
+
+    if positionX == food1.rect.centerx and positionY == food1.rect.centery:
+        print('yummy')
+        food1.update()
+        snakeLength += 1
 
     for entity in all_sprites:
         screen.blit(entity.surf, entity.rect)
 
-#        if pygame.sprite.spritecollideany(snake1, snake1):
-#            player1.kill()
-#            running = False
     pygame.display.flip()
 
-    clock.tick(30)
+    clock.tick(25)
 
 
 pygame.quit()
-
-
-
-
-'''
-From concept, to refactor
-
-import pygame
-from time import sleep
-from pygame.constants import KEYDOWN, K_ESCAPE, K_SPACE, K_UP, K_y, QUIT, K_DOWN, K_LEFT, K_RIGHT, WINDOWEXPOSED
-from random import randint, randrange
-
-
-def message(text, color, x, y):
-    message = fontStyle.render(text, 1, color)
-    screen.blit(message, [x, y])
-
-
-def playerSnake(snakeBlock, snakeList):
-    for i in snakeList:
-        pygame.draw.rect(screen, (100, 100, 100),
-                         (i[0], i[1], snakeBlock, snakeBlock))
-
-
-pygame.init()
-
-windowWidth = 400
-windowHeight = 400
-
-screen = pygame.display.set_mode((windowWidth, windowHeight))
-clock = pygame.time.Clock()
-
-
-fontStyle = pygame.font.SysFont(None, 25)
-fontStyleScore = pygame.font.SysFont(None, 20)
-fontStyleLevel = pygame.font.SysFont(None, 15)
-positionX = windowWidth/2
-positionY = windowHeight/2
-deltaX = 0
-deltaY = 0
-snakeBlock = 10
-snakeSpeed = 10
-snakeList = []
-snakeLength = 1
-
-foodX = round((randrange(10, windowWidth-10))/10) * 10
-foodY = round((randrange(10, windowHeight-10))/10) * 10
-
-
-appRunning = True
-while appRunning:
-
-    gameRunning = True
-    while gameRunning:
-        for event in pygame.event.get():
-            if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    gameRunning = False
-                elif event.type == QUIT:
-                    gameRunning = False
-                elif event.key == K_UP:
-                    deltaX = 0
-                    deltaY = -snakeBlock
-                elif event.key == K_DOWN:
-                    deltaX = 0
-                    deltaY = snakeBlock
-                elif event.key == K_LEFT:
-                    deltaX = -snakeBlock
-                    deltaY = 0
-                elif event.key == K_RIGHT:
-                    deltaX = snakeBlock
-                    deltaY = 0
-
-        positionX += deltaX
-        positionY += deltaY
-
-        if positionX > windowWidth - (snakeBlock) or positionX < 0:
-            gameRunning = False
-        elif positionY > windowHeight - (snakeBlock) or positionY < 0:
-            gameRunning = False
-        screen.fill((200, 200, 000))
-
-        food = pygame.draw.rect(screen, (50, 50, 50), [foodX, foodY, 10, 10])
-        if snakeLength >= 5 and snakeLength <= 10:
-            snakeSpeed = 15
-        elif snakeLength > 10 and snakeLength <= 15:
-            snakeSpeed = 20
-        elif snakeLength > 15:
-            snakeSpeed = 25
-
-        snakeHead = []
-        snakeHead.append(positionX)
-        snakeHead.append(positionY)
-        snakeList.append(snakeHead)
-        print('snakeHead', snakeHead)
-        print('snakeList: ', snakeList)
-        if len(snakeList) > snakeLength:
-            del snakeList[0]
-
-        for i in snakeList[:-1]:
-            if i == snakeHead:
-                gameRunning = False
-
-        playerSnake(snakeBlock, snakeList)
-
-        if positionX == foodX and positionY == foodY:
-            print('Yummy')
-            foodX = round((randint(10, windowWidth-10))/10) * 10
-            foodY = round((randint(10, windowHeight-10))/10) * 10
-            snakeLength += 1
-
-        pygame.display.flip()
-        clock.tick(snakeSpeed)
-
-    decisionToContinueOrExit = True
-    while decisionToContinueOrExit:
-        screen.fill((0, 0, 0))
-        message('Game Ended', (100, 0, 0), windowWidth/4, windowHeight/3)
-        message('Press space or y key to start again',
-                (100, 100, 0), windowWidth/4, windowHeight/3 + 40)
-        pygame.display.flip()
-        for event in pygame.event.get():
-            if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
-                    pygame.quit()
-                    quit()
-                elif event.key == K_y or event.key == K_SPACE:
-                    gameRunning = True
-                    decisionToContinueOrExit = False
-                    positionX = windowWidth/2
-                    positionY = windowHeight/2
-                    deltaX = 0
-                    deltaY = 0
-                    snakeBlock = 10
-                    snakeSpeed = 10
-                    snakeList = []
-                    snakeLength = 1
-                    foodX = round((randint(10, windowWidth-10))/10) * 10
-                    foodY = round((randint(10, windowHeight-10))/10) * 10
-                elif event.type == QUIT:
-                    pygame.quit()
-                    quit()
-
-
-pygame.quit()
-'''
